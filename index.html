@@ -52,32 +52,32 @@
     <video id="video" controls></video>
 
     <script>
-        function playStream() {
-            let url = document.getElementById("link").value;
-            const video = document.getElementById("video");
+function playStream() {
+    let url = document.getElementById("link").value;
+    const video = document.getElementById("video");
 
-            if (!url.includes(".m3u8")) {
-                alert("Por favor insira um link .m3u8 válido.");
-                return;
-            }
+    if (!url.includes(".m3u8")) {
+        alert("Por favor insira um link .m3u8 válido.");
+        return;
+    }
 
-            // ---- PROXY HTTPS PARA EVITAR MIXED CONTENT ----
-            const proxy = "https://cors-proxy.gh.dev/?url=";
-            const finalURL = proxy + encodeURIComponent(url);
+    // Novo proxy (melhor compatibilidade)
+    const proxy = "https://api.allorigins.win/raw?url=";
+    const finalURL = proxy + encodeURIComponent(url);
 
-            if (Hls.isSupported()) {
-                const hls = new Hls();
-                hls.loadSource(finalURL);
-                hls.attachMedia(video);
-            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = finalURL;
-            } else {
-                alert("Seu navegador não suporta HLS.");
-            }
-        }
-    </script>
+    if (Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(finalURL);
+        hls.attachMedia(video);
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = finalURL;
+    }
+}
+</script>
+
 
 </body>
 </html>
+
 
 
