@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Player M3U8</title>
+
+    <style>
+        body {
+            background: #121212;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 40px;
+        }
+        input {
+            width: 60%;
+            padding: 10px;
+            font-size: 18px;
+            border-radius: 8px;
+            border: none;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 25px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: #1db954;
+            color: white;
+        }
+        video {
+            margin-top: 30px;
+            width: 80%;
+            max-width: 800px;
+            border: 2px solid #555;
+            border-radius: 10px;
+        }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+
+<body>
+
+    <h1>Player de Transmissão M3U8</h1>
+
+    <input type="text" id="link" placeholder="Cole aqui o link .m3u8">
+    <br>
+    <button onclick="playStream()">Abrir Transmissão</button>
+
+    <video id="video" controls></video>
+
+    <script>
+        function playStream() {
+            const url = document.getElementById("link").value;
+            const video = document.getElementById("video");
+
+            if (!url.endsWith(".m3u8")) {
+                alert("Por favor insira um link .m3u8 válido.");
+                return;
+            }
+
+            if (Hls.isSupported()) {
+                const hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(video);
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = url;
+            } else {
+                alert("Seu navegador não suporta HLS.");
+            }
+        }
+    </script>
+
+</body>
+</html>
