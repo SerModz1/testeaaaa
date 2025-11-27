@@ -1,83 +1,130 @@
-<!DOCTYPE html>
-<html lang="pt">
+<!doctype html>
+<html lang="pt-PT">
 <head>
-    <meta charset="UTF-8">
-    <title>Player M3U8</title>
-
-    <style>
-        body {
-            background: #121212;
-            color: white;
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 40px;
-        }
-        input {
-            width: 60%;
-            padding: 10px;
-            font-size: 18px;
-            border-radius: 8px;
-            border: none;
-            margin-bottom: 20px;
-        }
-        button {
-            padding: 10px 25px;
-            font-size: 18px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            background: #1db954;
-            color: white;
-        }
-        video {
-            margin-top: 30px;
-            width: 80%;
-            max-width: 800px;
-            border: 2px solid #555;
-            border-radius: 10px;
-        }
-    </style>
-
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HLS Player - play .m3u8</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:#f6f7fb; color:#111; margin:0; padding:20px; }
+    .container { max-width:900px; margin:0 auto; }
+    h1{ margin:0 0 12px 0; font-size:1.25rem; }
+    .controls { display:flex; gap:8px; margin-bottom:12px; align-items:center; }
+    input[type="text"]{ flex:1; padding:8px 10px; font-size:1rem; border:1px solid #ccd; border-radius:6px; }
+    button{ padding:8px 12px; font-size:1rem; border-radius:6px; border:1px solid #aac; background:white; cursor:pointer; }
+    video{ width:100%; height:480px; background:black; border-radius:8px; outline:1px solid #ddd; }
+    .note{ margin-top:10px; color:#444; font-size:0.9rem; }
+    .log{ margin-top:8px; font-family: monospace; background:#fff; padding:8px; border-radius:6px; border:1px solid #eee; color:#333; max-height:140px; overflow:auto; }
+  </style>
 </head>
-
 <body>
+  <div class="container">
+    <h1>HLS Player (m3u8)</h1>
+    <div class="controls">
+      <input id="url" type="text" placeholder="Cola aqui a URL .m3u8 (ex: https://example.com/stream.m3u8)" />
+      <button id="playBtn">Abrir</button>
+      <button id="stopBtn">Parar</button>
+    </div>
 
-    <h1>Player de Transmissão M3U8</h1>
+    <video id="video" controls playsinline></video>
 
-    <input type="text" id="link" placeholder="Cole aqui o link .m3u8">
-    <br>
-    <button onclick="playStream()">Abrir Transmissão</button>
+    <div class="note">
+      Nota: navegadores como Safari suportam HLS nativamente. Para outros navegadores (Chrome, Firefox) usamos <code>hls.js</code>.
+      Se a reprodução falhar, verifica CORS no servidor do stream.
+    </div>
 
-    <video id="video" controls></video>
+    <div class="log" id="log"></div>
+  </div>
 
-    <script>
-function playStream() {
-    let url = document.getElementById("link").value;
-    const video = document.getElementById("video");
+  <!-- hls.js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.0/dist/hls.min.js"></script>
+  <script>
+    const video = document.getElementById('video');
+    const urlInput = document.getElementById('url');
+    const playBtn = document.getElementById('playBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const logEl = document.getElementById('log');
 
-    if (!url.includes(".m3u8")) {
-        alert("Por favor insira um link .m3u8 válido.");
+    let hls = null;
+
+    function log(...args) {
+      const line = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+      const p = document.createElement('div');
+      p.textContent = `[${new Date().toLocaleTimeString()}] ${line}`;
+      logEl.prepend(p);
+    }
+
+    function isSafariLike() {
+      // Simple detection for Safari iOS / macOS HLS native support
+      const ua = navigator.userAgent;
+      return /Safari/.test(ua) && !/Chrome|Chromium|Android/.test(ua);
+    }
+
+    async function playUrl(url) {
+      if (!url) { log('URL vazia'); return; }
+      // cleanup previous
+      if (hls) {
+        try { hls.destroy(); } catch(e) {}
+        hls = null;
+      }
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+
+      log('Tentando abrir', url);
+
+      // If browser supports native HLS (Safari), set src directly
+      if (video.canPlayType('application/vnd.apple.mpegurl') || isSafariLike()) {
+        log('Usando player nativo (Safari compatível).');
+        video.src = url;
+        try { await video.play(); log('Playback started (nativo)'); } catch (e) { log('Erro ao iniciar reprodução (nativo):', e.message); }
         return;
-    }
+      }
 
-    // Novo proxy (melhor compatibilidade)
-    const proxy = "https://api.allorigins.win/raw?url=";
-    const finalURL = proxy + encodeURIComponent(url);
-
-    if (Hls.isSupported()) {
-        const hls = new Hls();
-        hls.loadSource(finalURL);
+      // Otherwise use hls.js
+      if (window.Hls && Hls.isSupported()) {
+        log('Usando hls.js');
+        hls = new Hls({
+          // debug: true,
+          // optional config here
+        });
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+          log('Manifest parseado — iniciando reprodução');
+          video.play().catch(e => log('play() falhou:', e.message));
+        });
+        hls.on(Hls.Events.ERROR, function(event, data) {
+          log('hls.js erro:', data.type, data.details, data);
+          if (data.fatal) {
+            log('Erro fatal: tentando recuperar...');
+            try {
+              hls.recoverMediaError();
+            } catch (err) {
+              log('Falha na recuperação:', err);
+            }
+          }
+        });
         hls.attachMedia(video);
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = finalURL;
+        hls.loadSource(url);
+        return;
+      }
+
+      log('HLS não suportado neste browser.');
     }
-}
-</script>
 
+    playBtn.addEventListener('click', () => playUrl(urlInput.value.trim()));
+    stopBtn.addEventListener('click', () => {
+      if (hls) { try { hls.destroy(); } catch(e) {} hls = null; }
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      log('Parado.');
+    });
 
+    // tecla Enter para abrir
+    urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') playBtn.click(); });
+
+    // exemplo
+    urlInput.value = '';
+    log('Pronto — cola uma URL .m3u8 e clica "Abrir".');
+  </script>
 </body>
 </html>
-
-
-
